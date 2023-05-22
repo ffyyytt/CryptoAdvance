@@ -136,8 +136,9 @@ void circulant(int* a, int ** res, int n)
     }
 }
 
-bool BitFlipping(int** h0, int** h1, int** s, int** resu, int **resv, int n, int T, int w, int max_iter = 1000)
+bool BitFlipping(int** h0, int** h1, int** s, int** resu, int **resv, int n, int T, int w, int max_iter = 1000, bool smooth = true)
 {
+    bool res = true;
     int iter = 0;
     int **H = allocate_matrix(n, 2*n);
     int **uv = allocate_matrix(2*n, 1);
@@ -173,26 +174,28 @@ bool BitFlipping(int** h0, int** h1, int** s, int** resu, int **resv, int n, int
             syndrome[0][i] = (syndrome[0][i] + syndrome_temp[i][0]) % 2;
         }
 
-        if (sum(flipped_position, 2*n, 1) == 0)
-        {
-            T = T-1;
-        }
-        else if (sum(syndrome, 1, n) == lastlasts || sum(syndrome, 1, n) == lasts)
-        {
-            T = std::max(T+1, 2)*2;
-            for (int i = 0; i < n; i++){
-                resu[0][i] = 0;
-                resv[0][i] = 0;
-                syndrome[0][i] = s[0][i];
+        if (smooth){
+            if (sum(flipped_position, 2*n, 1) == 0)
+            {
+                T = T-1;
             }
-        }
-        else if (sum(flipped_position, 2*n, 1) > 50*w)
-        {
-            T += sum(flipped_position, 2*n, 1) / w / 20;
-            for (int i = 0; i < n; i++){
-                resu[0][i] = 0;
-                resv[0][i] = 0;
-                syndrome[0][i] = s[0][i];
+            else if (sum(syndrome, 1, n) == lastlasts || sum(syndrome, 1, n) == lasts)
+            {
+                T = std::max(T+1, 2)*2;
+                for (int i = 0; i < n; i++){
+                    resu[0][i] = 0;
+                    resv[0][i] = 0;
+                    syndrome[0][i] = s[0][i];
+                }
+            }
+            else if (sum(flipped_position, 2*n, 1) > 50*w)
+            {
+                T += sum(flipped_position, 2*n, 1) / w / 20;
+                for (int i = 0; i < n; i++){
+                    resu[0][i] = 0;
+                    resv[0][i] = 0;
+                    syndrome[0][i] = s[0][i];
+                }
             }
         }
 
@@ -210,12 +213,22 @@ bool BitFlipping(int** h0, int** h1, int** s, int** resu, int **resv, int n, int
     for (int i = 0; i < n; i++)
     {
         if (syndrome[0][i] != s[0][i])
-            return false;
+            res =  false;
     }
-    return true;
+
+    free_matrix(H, n, 2*n);
+    free_matrix(uv, 2*n, 1);
+    free_matrix(flipu, 1, n);
+    free_matrix(flipv, 1, n);
+    free_matrix(total, 1, 2*n);
+    free_matrix(syndrome, 1, n);
+    free_matrix(syndrome_temp, n, 1);
+    free_matrix(flipped_position, 2*n, 1);
+
+    return res;
 }
 
-void test_BitFlipping(int n, int w, int T)
+void test_BitFlipping(int n, int w, int T, bool smooth)
 {
     int **e0 = allocate_matrix(1, n);
     int **e1 = allocate_matrix(1, n);
@@ -228,8 +241,8 @@ void test_BitFlipping(int n, int w, int T)
     int **s = allocate_matrix(1, n);
     int **s0 = allocate_matrix(1, n);
     int **s1 = allocate_matrix(1, n);
-    int **resu = allocate_matrix(1, 2*n);
-    int **resv = allocate_matrix(1, 2*n);
+    int **resu = allocate_matrix(1, n);
+    int **resv = allocate_matrix(1, n);
 
     generate_random_vector(e0[0], n, w);
     generate_random_vector(e1[0], n, w);
@@ -245,20 +258,37 @@ void test_BitFlipping(int n, int w, int T)
     multiply(e1, mh1t, s1, 1, n, n);
     add(s0, s1, s, 1, n);
 
-    BitFlipping(mh0, mh1, s, resu, resv, n, T, w);
+    BitFlipping(mh0, mh1, s, resu, resv, n, T, w, 1000, smooth);
+
+    free_matrix(e0, 1, n);
+    free_matrix(e1, 1, n);
+    free_matrix(h0, 1, n);
+    free_matrix(h1, 1, n);
+    free_matrix(mh0, n, n);
+    free_matrix(mh1, n, n);
+    free_matrix(mh0t, n, n);
+    free_matrix(mh1t, n, n);
+    free_matrix(s, 1, n);
+    free_matrix(s0, 1, n);
+    free_matrix(s1, 1, n);
+    free_matrix(resu, 1, n);
+    free_matrix(resv, 1, n);
 }
 
 int main(int argc, char *argv[])
 {
     int k = 26, w = 39, n = 4813;
+    bool smooth = true;
     if (argc > 1)
         k = atoi(argv[1]);
     if (argc > 2)
         w = atoi(argv[2]);
     if (argc > 3)
         n = atoi(argv[3]);
+    if (argc > 4)
+        smooth = atoi(argv[4]);
     clock_t tStart = clock();
     srand(time(NULL));
-    test_BitFlipping(n, w, k);
+    test_BitFlipping(n, w, k, smooth);
     printf("Time taken: %.2fs\n", (double)(clock() - tStart)/CLOCKS_PER_SEC);
 }
